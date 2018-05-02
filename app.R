@@ -129,6 +129,35 @@ ui <- fluidPage(
                               #br(),
                               
                               # Outputting the leaflet map.
+                              highchartOutput(outputId = "hour_departure")
+                            )
+                   ),
+                   tabPanel(title = returnDescription("Arrivals"),
+                            # Well panel to organise the output
+                            wellPanel(
+                              
+                              # Hint about how the map works.
+                              #helpText("Click on the lines to see the route. Click on the red circle to see."),
+                              #br(),
+                              
+                              # Outputting the leaflet map.
+                              highchartOutput(outputId = "hour_arrival")
+                            )
+                   )
+                 )
+        ),
+        #First tab for Map
+        tabPanel("Day",
+                 tabsetPanel(
+                   tabPanel(title = returnDescription("Departures"),
+                            # Well panel to organise the output
+                            wellPanel(
+                              
+                              # Hint about how the map works.
+                              #helpText("Click on the lines to see the route. Click on the red circle to see."),
+                              #br(),
+                              
+                              # Outputting the leaflet map.
                               highchartOutput(outputId = "day_departure")
                             )
                    ),
@@ -299,6 +328,16 @@ server <- function(input, output, session) {
     return(df)
   })
   
+  hourFiltered <- eventReactive(input$updateButton, {
+    df1() %>%
+      group_by(Type, Flight.Type, Hour) %>%
+      summarise(AverageDelay = round(mean(AverageDelay, na.rm = T),2),
+                TotalFlight = sum(TotalFlight)) %>%
+      mutate(Hour = as.numeric(Hour)) %>%
+      arrange(Type,Flight.Type,Hour) %>%
+      ungroup()
+  })
+  
   dayFiltered <- eventReactive(input$updateButton, {
     df1() %>% 
       group_by(Type, Flight.Type, Day) %>%
@@ -322,6 +361,29 @@ server <- function(input, output, session) {
                 TotalFlight = sum(TotalFlight)) %>%
       ungroup()
   })
+  
+  hourPlot <- function(df,type = NULL){
+    chart <- highchart() %>%
+      hc_add_series(df[df$Type==type,],
+                    type = "line",
+                    hcaes(x=Hour,
+                          y=AverageDelay,
+                          group=Flight.Type)) %>%
+      hc_tooltip(pointFormat = "<b>Number of Flights:</b> {point.TotalFlight} <br>
+                                <b>Average Delay:</b> {point.AverageDelay}") %>%
+      
+      hc_xAxis(categories = df$Hour) %>%
+      hc_yAxis(title = list(text = "Average Delay time in minutes")) %>% 
+      hc_title(text = paste(type,"Average Delay time by Hour"),
+               align = "center") %>%
+      hc_subtitle(text = "Click on the points to more information",
+                  align = "center") %>%
+      hc_add_theme(hc_theme_google()) %>%
+      hc_credits(enabled = TRUE,
+                 text = "Source: Brazillian National Civil Aviation Agency",
+                 style = list(fontSize = "10px"))
+    return(chart)
+  }
   
   dayPlot <- function(df, type = NULL){
     highchart() %>% 
@@ -394,8 +456,6 @@ server <- function(input, output, session) {
   }
   
   historicalPlot <- function(df, type = NULL){
-    print(head(df))
-    
     chart <- highchart(type = "stock") %>%
       hc_add_series(df[df$Type == type,],
                     type = "line",
@@ -417,6 +477,14 @@ server <- function(input, output, session) {
       hc_add_theme(hc_theme_google())
     return(chart)
   }
+  
+  output$hour_departure <- renderHighchart(
+    hourPlot(hourFiltered(), type = "Departure")
+  )
+  
+  output$hour_arrival <- renderHighchart(
+    hourPlot(hourFiltered(), type = "Arrival")
+  )
   
   output$day_departure <- renderHighchart(
     dayPlot(dayFiltered(), type = "Departure")

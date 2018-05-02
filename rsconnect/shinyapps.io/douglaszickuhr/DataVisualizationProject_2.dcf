@@ -5,8 +5,8 @@ account: douglaszickuhr
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 335293
-bundleId: 1350493
+bundleId: 1352680
 url: https://douglaszickuhr.shinyapps.io/DataVisualizationProject_2/
-when: 1525220448.29024
+when: 1525303311.74104
 asMultiple: FALSE
 asStatic: FALSE

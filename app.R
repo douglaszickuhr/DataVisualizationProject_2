@@ -14,36 +14,55 @@ library(data.table)
 library(highcharter)
 library(DT)
 
+# Function to load the Average Delay File by Hour, WeekDay, Day and Month
 loadDelayFile <- function(file, 
                           colClasses = NULL){
   df <- fread(file = file,
               colClasses = colClasses)
   
+  # Converting Day to Numeric for ordering purposes
   df$Day <- as.numeric(df$Day)
+  
+  # Converting Month and Weekday to factor
   df$Month <- factor(df$Month,levels(df$Month)[c(5,4,8,1,9,7,6,2,12,11,10,3)])
   df$WeekDay <- factor(df$WeekDay,levels(df$WeekDay)[c(4,2,6,7,5,1,3)])
+  
+  # Returning the dataframe
   return(df)
 }
 
+# Function to load the Average Delay Time and Total Flights by date
 loadDelayByTimeFile <- function(file,
                                 colClasses = NULL){
+  # Reading the file using fread
   df <- fread(file = file,
               colClasses = colClasses)
+  
+  # Converting the variable Day to ymd format
   df$Day <- ymd(df$Day)
   
+  # Retun the dataframe
   return(df)
 }
 
+# Function to load the average delay by cause
 loadDelayTimeByCause <- function(file,
                                  colClasses = NULL){
+  
+  # Reading the file using fread
   df <- fread(file = file,
               colClasses = colClasses)
+  
+  # Removing variables which the delay is positive
   df %>%
     filter(AverageArrivalDelay > 0 & AverageDepartureDelay > 0) %>%
     arrange(desc(TotalFlight))
 }
 
+# Function to return the dataframe filtered by Day
 filterByDay <- function(df){
+  
+  # Filterign using dplyr, grouped by Type, Flight Type and Day
   df <- df %>% 
     group_by(Type, Flight.Type, Day) %>%
     summarise(AverageDelay = round(mean(AverageDelay, na.rm = T),2),
@@ -51,7 +70,10 @@ filterByDay <- function(df){
     ungroup()
 }
 
+# Function to return the dataframe filtered by Month
 filterByMonth <- function(df){
+  
+  # Filterign using dplyr, grouped by Type, Flight Type and Month
   df %>%
     group_by(Type, Flight.Type, Month) %>%
     summarise(AverageDelay = round(mean(AverageDelay, na.rm = T),2),
@@ -59,7 +81,10 @@ filterByMonth <- function(df){
     ungroup()
 }
 
+# Function to return the dataframe filtered by Weekday
 filterByWeekDay <- function(df){
+  
+  # Filterign using dplyr, grouped by Type, Flight Type and Month
   df %>%
     group_by(Type, Flight.Type, WeekDay) %>%
     summarise(AverageDelay = round(mean(AverageDelay, na.rm = T),2),
@@ -67,29 +92,33 @@ filterByWeekDay <- function(df){
     ungroup()
 }
 
+# Function to return the description plus image
 returnDescription <- function(type){
   HTML(paste(img(src=paste0('http://www.tijoletarustica.com.br/img/',type,'.png'),
                  height = "15px"),type))
 }
 
+# Reading the Average Delay File
 averageDelay <- loadDelayFile("AverageDelay.csv",
                               colClasses = c("factor", "factor", "factor", "factor",
                                              "numeric", "numeric", "numeric", "numeric"))
 
+# Reading the Average Delay File by Time
 delayByTime <- loadDelayByTimeFile("DelayByTime.csv",
                                    colClasses = c("factor","factor","character",
                                                   "numeric","numeric"))
 
+# Reading the Average Delay File by Cause
 delayByCause <- loadDelayTimeByCause("AverageDelayByCause.csv",
                                      colClasses = c("factor","numeric","numeric","integer"))
-
 
 # Shiny User interface
 ui <- fluidPage(
   
   # Title of panel
   titlePanel(paste("Brazilian Flights Delay Analysis"), 
-             windowTitle = "Data Visualization CA2 - Dashboard 2"),
+             windowTitle = "Data Visualization Final Project - Dashboard 2"),
+  helpText("The raw dataset contains over 2M flight observations from 31/Dec/2014 to 31/Jul/2017 "),
   sidebarLayout(
     
     # The panel has the select input
@@ -109,6 +138,7 @@ ui <- fluidPage(
                                    selected = levels(averageDelay$Flight.Type)
                 )
       ),
+      # Well panel to cite Shiny and RStudio
       wellPanel(h5("Built with",
                    tags$a(img(src = "https://www.rstudio.com/wp-content/uploads/2014/04/shiny.png",
                               height = "30px"),
@@ -126,178 +156,173 @@ ui <- fluidPage(
       # Tabset to create different tabs      
       tabsetPanel(
         
-        #First tab for Map
+        #First tab for Hour Line Plot 
         tabPanel("Hour",
                  tabsetPanel(
+                   
+                   # Panel to show the Departures
                    tabPanel(title = returnDescription("Departures"),
+                            
                             # Well panel to organise the output
                             wellPanel(
                               
-                              # Hint about how the map works.
-                              #helpText("Click on the lines to see the route. Click on the red circle to see."),
-                              #br(),
-                              
-                              # Outputting the leaflet map.
+                              # Outputting the Departures Hour Map
                               highchartOutput(outputId = "hour_departure")
                             )
                    ),
+                   
+                   # Panel to show the Arrivals
                    tabPanel(title = returnDescription("Arrivals"),
+                            
                             # Well panel to organise the output
                             wellPanel(
                               
-                              # Hint about how the map works.
-                              #helpText("Click on the lines to see the route. Click on the red circle to see."),
-                              #br(),
-                              
-                              # Outputting the leaflet map.
+                              # Outputting the Arrivals Hour Map
                               highchartOutput(outputId = "hour_arrival")
                             )
                    )
                  )
         ),
-        #First tab for Map
+        
+        #Second tab for Day Map
         tabPanel("Day",
                  tabsetPanel(
+                   
+                   # Panel to show the departure plot
                    tabPanel(title = returnDescription("Departures"),
+                            
                             # Well panel to organise the output
                             wellPanel(
                               
-                              # Hint about how the map works.
-                              #helpText("Click on the lines to see the route. Click on the red circle to see."),
-                              #br(),
+                              # Hint about how plot
+                              helpText("The size of the circle is related to the number of flights."),
                               
-                              # Outputting the leaflet map.
+                              # Outputting the Departures Day Plot.
                               highchartOutput(outputId = "day_departure")
                             )
                    ),
+                   
+                   # Panel to show the Arrivals Day plot
                    tabPanel(title = returnDescription("Arrivals"),
+                            
                             # Well panel to organise the output
                             wellPanel(
                               
-                              # Hint about how the map works.
-                              #helpText("Click on the lines to see the route. Click on the red circle to see."),
-                              #br(),
+                              # Hint about how plot
+                              helpText("The size of the circle is related to the number of flights."),
                               
-                              # Outputting the leaflet map.
+                              # Outputting the Arrivals Day Plot.
                               highchartOutput(outputId = "day_arrival")
                             )
                    )
                  )
         ),
-        #First tab for Map
+        
+        #Third tab for Weekday plot
         tabPanel("Day of Week",
                  tabsetPanel(
+                   
+                   # Panel to show the Departures plot
                    tabPanel(title = returnDescription("Departures"),
+                            
                             # Well panel to organise the output
                             wellPanel(
                               
-                              # Hint about how the map works.
-                              #helpText("Click on the lines to see the route. Click on the red circle to see."),
-                              #br(),
-                              
-                              # Outputting the leaflet map.
+                              # Outputting the Departures Weekday Plot
                               highchartOutput(outputId = "week_departure")
                             )
                    ),
+                   
+                   # Panel to show the Arrivals plot
                    tabPanel(title = returnDescription("Arrivals"),
                             # Well panel to organise the output
                             wellPanel(
                               
-                              # Hint about how the map works.
-                              #helpText("Click on the lines to see the route. Click on the red circle to see."),
-                              #br(),
-                              
-                              # Outputting the leaflet map.
+                               # Outputting the Arrivals Weekday Plot
                               highchartOutput(outputId = "week_arrival")
                             )
                    )
                  )
         ),
         
-        #First tab for Map
+        #Fourth tab for Month Plot
         tabPanel("Month",
                  tabsetPanel(
+                   
+                   # Panel to show the Departures plot
                    tabPanel(title = returnDescription("Departures"),
                             # Well panel to organise the output
                             wellPanel(
-                              
-                              # Hint about how the map works.
-                              #helpText("Click on the lines to see the route. Click on the red circle to see."),
-                              #br(),
-                              
-                              # Outputting the leaflet map.
+                             
+                              # Outputting the Departures Month Plot
                               highchartOutput(outputId = "month_departure")
                             )
                    ),
+                   
+                   # Panel to show the Arrivals plot
                    tabPanel(title = returnDescription("Arrivals"),
                             # Well panel to organise the output
                             wellPanel(
                               
-                              # Hint about how the map works.
-                              #helpText("Click on the lines to see the route. Click on the red circle to see."),
-                              #br(),
-                              
-                              # Outputting the leaflet map.
+                              # Outputting the Arrivals Month Plot
                               highchartOutput(outputId = "month_arrival")
                             )
                    )
                  )
         ),
         
-        #First tab for Map
+        #Fifth tab for Historical Data
         tabPanel("Historical Data",
                  tabsetPanel(
+                   
+                   # Panel to show the Departures plot
                    tabPanel(title = returnDescription("Departures"),
                             # Well panel to organise the output
                             wellPanel(
                               
-                              # Hint about how the map works.
-                              #helpText("Click on the lines to see the route. Click on the red circle to see."),
-                              #br(),
-                              
-                              # Outputting the leaflet map.
+                              # Outputting the Departures Historical Plot
                               highchartOutput(outputId = "historical_departure")
                             )
                    ),
+                   
+                   # Panel to show the Arrivals plot
                    tabPanel(title = returnDescription("Arrivals"),
                             # Well panel to organise the output
                             wellPanel(
                               
-                              # Hint about how the map works.
-                              #helpText("Click on the lines to see the route. Click on the red circle to see."),
-                              #br(),
-                              
-                              # Outputting the leaflet map.
+                              # Outputting the Arrivals Historical Plot
                               highchartOutput(outputId = "historical_arrival")
                             )
                    )
                  )
         ),
-        #First tab for Map
+        
+        #Sixth tab - Delay by Cause
         tabPanel("Delay by Cause",
                  
                  # Well panel to organise the output
                  wellPanel(
                    
-                   # Hint about how the map works.
-                   helpText("Choose the options for the Treemap"),
+                   # Slider input to set the number of top records to show on the treemap
                    sliderInput(inputId = "treemap_size",
                                label = "Top Causes to plot on Treemap",
                                min = 1, 
-                               max = 25, 
-                               value = 10,
+                               max = 10, 
+                               value = 5,
                                width = "30%"),
-                   #br(),
-                   #actionButton(inputId = "updatetreemap",
-                   #             label = "Update Treemap"),
-                   
                    hr(),
                    
-                   # Outputting the leaflet map.
+                   # Hint about the Treemap
+                   helpText("The size of the rectangles are determined by the number of flights whilst the color is determined by the delay according to the legend on the right side."),
+                   hr(),
+                   
+                   
+                   # Outputting the Treemap
                    highchartOutput(outputId = "treemap")
                  )
         ),
-        #First tab for Map
+        
+        #Seventh tab - Heatmap
         tabPanel("HeatMap",
                  
                  # Well panel to organise the output
@@ -306,6 +331,8 @@ ui <- fluidPage(
                    # Hint about how the map works.
                    helpText("The heatmap diagram has differente attributes and must be manually loaded."),
                    helpText("Press the button bellow to load the chart"),
+                   
+                   # Input to set the details for the heatmap
                    div(style="display: inline-block;vertical-align:top; width: 150px;",selectInput(inputId = "heatmap_type",
                                                                                                    label = "Arrival/Departure",
                                                                                                    choices = c("Arrival","Departure"),
@@ -317,6 +344,8 @@ ui <- fluidPage(
                                                                                                    selected = "International",
                                                                                                    multiple = T)),
                    br(),
+                   
+                   # Button to update the heatmap
                    actionButton(inputId = "updateHeatMapButton",
                                 label = "Load HeatMap"),
                    
@@ -328,7 +357,7 @@ ui <- fluidPage(
                               # Well panel to organise the output
                               wellPanel(
                                 
-                                # Outputting the leaflet map.
+                                # Outputting heatmap for week day
                                 highchartOutput(outputId = "heatmap_weekday")
                               )
                      ),
@@ -336,15 +365,15 @@ ui <- fluidPage(
                               # Well panel to organise the output
                               wellPanel(
                                 
-                                # Outputting the treema.
+                                # Outputting heatmap for day of month
                                 highchartOutput(outputId = "heatmap_day_of_month")
                               )
                      )
                    )
                  )
-      ),
+        ),
         
-        # Third tab - Showing the data and allowing the user to download it
+        # Seventh tab - Showing the data and allowing the user to download it
         tabPanel("Data",
                  
                  # Well panel for tidying the visualization
@@ -369,9 +398,7 @@ ui <- fluidPage(
         )
       ),
       
-      # Listing the total of records found.
-      uiOutput(outputId = "n"),
-      
+      # Listing the details
       h5(tags$a(img(src = "https://www.ncirl.ie/Portals/0/nciLogo.png", 
                     height = "30px"),
                 href = "https://www.ncirl.ie"
@@ -390,12 +417,16 @@ ui <- fluidPage(
 # Server - Shinny
 server <- function(input, output, session) {
   
-  # Take a reactive dependency on input$button, but not on any other inputs
+  # Take a reactive dependency on input$type
   df1 <- eventReactive(input$type, {
+    # Requesting input$type
     req(input$type)
+    
+    # Filtering averageDelay using the input$type
     df <- averageDelay %>%
       filter(Flight.Type %in% input$type)
     
+    # Returning the dataframe
     return(df)
   })
   
@@ -482,7 +513,8 @@ server <- function(input, output, session) {
       hc_tooltip(pointFormat = "<b>Number of Flights:</b> {point.TotalFlight} <br>
                                 <b>Average Delay:</b> {point.AverageDelay}") %>%
       
-      hc_xAxis(categories = df$Hour) %>%
+      hc_xAxis(categories = df$Hour, 
+               title = list(text = "Hour of Day")) %>%
       hc_yAxis(title = list(text = "Average Delay time in minutes")) %>% 
       hc_title(text = paste(type,"Average Delay time by Hour"),
                align = "center") %>%
@@ -679,13 +711,14 @@ server <- function(input, output, session) {
                 margin = 0,
                 symbolHeight = 220,
                 y = 100,
-                align = 'right') %>%
+                align = 'right',
+                title = list(text = "Average Delay")) %>%
       hc_add_theme(hc_theme_google())  
     
     return(chart)
   }
   
-
+  
   output$hour_departure <- renderHighchart(
     hourPlot(hourFiltered(), type = "Departure")
   )

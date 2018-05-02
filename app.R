@@ -4,6 +4,7 @@
 # Title: Analysis of Flights Delay in Brazil
 # Author: Douglas Zikcuhr
 
+
 # Loading libraries
 library(lubridate)
 library(tidyverse)
@@ -33,6 +34,15 @@ loadDelayByTimeFile <- function(file,
   return(df)
 }
 
+loadDelayTimeByCause <- function(file,
+                                 colClasses = NULL){
+  df <- fread(file = file,
+              colClasses = colClasses)
+  df %>%
+    filter(AverageArrivalDelay > 0 & AverageDepartureDelay > 0) %>%
+    arrange(desc(TotalFlight))
+}
+
 filterByDay <- function(df){
   df <- df %>% 
     group_by(Type, Flight.Type, Day) %>%
@@ -57,6 +67,11 @@ filterByWeekDay <- function(df){
     ungroup()
 }
 
+returnDescription <- function(type){
+  HTML(paste(img(src=paste0('http://www.tijoletarustica.com.br/img/',type,'.png'),
+                 height = "15px"),type))
+}
+
 averageDelay <- loadDelayFile("AverageDelay.csv",
                               colClasses = c("factor", "factor", "factor", "factor",
                                              "numeric", "numeric", "numeric", "numeric"))
@@ -65,17 +80,16 @@ delayByTime <- loadDelayByTimeFile("DelayByTime.csv",
                                    colClasses = c("factor","factor","character",
                                                   "numeric","numeric"))
 
-returnDescription <- function(type){
-  HTML(paste(img(src=paste0('http://www.tijoletarustica.com.br/img/',type,'.png'),
-                 height = "15px"),type))
-}
+delayByCause <- loadDelayTimeByCause("AverageDelayByCause.csv",
+                                     colClasses = c("factor","numeric","numeric","integer"))
+
 
 # Shiny User interface
 ui <- fluidPage(
   
   # Title of panel
-  titlePanel(paste("Brazilian Flights Delay Analysis from","31/12/2014","to","31/07/2017"), 
-             windowTitle = "Data Visualization CA2 - Plot 1"),
+  titlePanel(paste("Brazilian Flights Delay Analysis"), 
+             windowTitle = "Data Visualization CA2 - Dashboard 2"),
   sidebarLayout(
     
     # The panel has the select input
@@ -94,11 +108,6 @@ ui <- fluidPage(
                                    choices = levels(averageDelay$Flight.Type),
                                    selected = levels(averageDelay$Flight.Type)
                 )
-      ),
-      wellPanel(h3("Show the data"),
-                # Action button to show
-                actionButton(inputId = "updateButton", 
-                             label = "Show Charts")
       ),
       wellPanel(h5("Built with",
                    tags$a(img(src = "https://www.rstudio.com/wp-content/uploads/2014/04/shiny.png",
@@ -264,6 +273,76 @@ ui <- fluidPage(
                    )
                  )
         ),
+        #First tab for Map
+        tabPanel("Delay by Cause",
+                 
+                 # Well panel to organise the output
+                 wellPanel(
+                   
+                   # Hint about how the map works.
+                   helpText("Choose the options for the Treemap"),
+                   sliderInput(inputId = "treemap_size",
+                               label = "Top Causes to plot on Treemap",
+                               min = 1, 
+                               max = 25, 
+                               value = 10,
+                               width = "30%"),
+                   #br(),
+                   #actionButton(inputId = "updatetreemap",
+                   #             label = "Update Treemap"),
+                   
+                   hr(),
+                   
+                   # Outputting the leaflet map.
+                   highchartOutput(outputId = "treemap")
+                 )
+        ),
+        #First tab for Map
+        tabPanel("HeatMap",
+                 
+                 # Well panel to organise the output
+                 wellPanel(
+                   
+                   # Hint about how the map works.
+                   helpText("The heatmap diagram has differente attributes and must be manually loaded."),
+                   helpText("Press the button bellow to load the chart"),
+                   div(style="display: inline-block;vertical-align:top; width: 150px;",selectInput(inputId = "heatmap_type",
+                                                                                                   label = "Arrival/Departure",
+                                                                                                   choices = c("Arrival","Departure"),
+                                                                                                   selected = "Arrival",
+                                                                                                   multiple = F)),
+                   div(style="display: inline-block;vertical-align:top; width: 300px;",selectInput(inputId = "heatmap_flight_type",
+                                                                                                   label = "Flight Type",
+                                                                                                   choices = c("International","Domestic","Regional"),
+                                                                                                   selected = "International",
+                                                                                                   multiple = T)),
+                   br(),
+                   actionButton(inputId = "updateHeatMapButton",
+                                label = "Load HeatMap"),
+                   
+                   hr(),
+                   
+                   # Well panel to organise the output
+                   tabsetPanel(
+                     tabPanel(title = "Week day by Hour",
+                              # Well panel to organise the output
+                              wellPanel(
+                                
+                                # Outputting the leaflet map.
+                                highchartOutput(outputId = "heatmap_weekday")
+                              )
+                     ),
+                     tabPanel(title = "Day by Month",
+                              # Well panel to organise the output
+                              wellPanel(
+                                
+                                # Outputting the treema.
+                                highchartOutput(outputId = "heatmap_day_of_month")
+                              )
+                     )
+                   )
+                 )
+      ),
         
         # Third tab - Showing the data and allowing the user to download it
         tabPanel("Data",
@@ -312,7 +391,7 @@ ui <- fluidPage(
 server <- function(input, output, session) {
   
   # Take a reactive dependency on input$button, but not on any other inputs
-  df1 <- eventReactive(input$updateButton, {
+  df1 <- eventReactive(input$type, {
     req(input$type)
     df <- averageDelay %>%
       filter(Flight.Type %in% input$type)
@@ -320,7 +399,7 @@ server <- function(input, output, session) {
     return(df)
   })
   
-  df2  <- eventReactive(input$updateButton, {
+  df2  <- eventReactive(input$type, {
     req(input$type)
     df <- delayByTime %>%
       filter(Flight.Type %in% input$type)
@@ -328,8 +407,12 @@ server <- function(input, output, session) {
     return(df)
   })
   
-  hourFiltered <- eventReactive(input$updateButton, {
+  hourFiltered <- eventReactive(input$type, {
     df1() %>%
+      # Data from Hours 0,1 and 23 had to been removed due to big noisy in the source data
+      mutate(AverageDelay = if_else((Flight.Type == "International" & 
+                                       Hour %in% c("0","1","23") & 
+                                       Type == "Departure"), 0,AverageDelay)) %>%
       group_by(Type, Flight.Type, Hour) %>%
       summarise(AverageDelay = round(mean(AverageDelay, na.rm = T),2),
                 TotalFlight = sum(TotalFlight)) %>%
@@ -338,7 +421,7 @@ server <- function(input, output, session) {
       ungroup()
   })
   
-  dayFiltered <- eventReactive(input$updateButton, {
+  dayFiltered <- eventReactive(input$type, {
     df1() %>% 
       group_by(Type, Flight.Type, Day) %>%
       summarise(AverageDelay = round(mean(AverageDelay, na.rm = T),2),
@@ -346,7 +429,7 @@ server <- function(input, output, session) {
       ungroup()
   })
   
-  weekFiltered <- eventReactive(input$updateButton, {
+  weekFiltered <- eventReactive(input$type, {
     df1() %>%
       group_by(Type, Flight.Type, WeekDay) %>%
       summarise(AverageDelay = round(mean(AverageDelay, na.rm = T),2),
@@ -354,7 +437,7 @@ server <- function(input, output, session) {
       ungroup()
   }) 
   
-  monthFiltered <- eventReactive(input$updateButton, {
+  monthFiltered <- eventReactive(input$type, {
     df1() %>%
       group_by(Type, Flight.Type, Month) %>%
       summarise(AverageDelay = round(mean(AverageDelay, na.rm = T),2),
@@ -362,7 +445,34 @@ server <- function(input, output, session) {
       ungroup()
   })
   
-  hourPlot <- function(df,type = NULL){
+  weekDayHeatMapFiltered <- eventReactive(input$updateHeatMapButton,{
+    req(input$heatmap_type)
+    req(input$heatmap_flight_type)
+    averageDelay %>%
+      filter(Type == input$heatmap_type & 
+               Flight.Type %in% input$heatmap_flight_type) %>%
+      group_by(Type,WeekDay,Hour) %>%
+      summarise(AverageDelay = mean(AverageDelay)) %>%
+      ungroup() %>%
+      mutate(Hour = as.numeric(Hour)) %>%
+      arrange(WeekDay,Hour) %>%
+      filter(Hour > 2)
+  })
+  
+  dayOfMonthHeatMapFiltered <- eventReactive(input$updateHeatMapButton,{
+    req(input$heatmap_type)
+    req(input$heatmap_flight_type)
+    averageDelay %>%
+      filter(Type == input$heatmap_type & 
+               Flight.Type %in% input$heatmap_flight_type) %>%
+      group_by(Type,Month,Day) %>%
+      summarise(AverageDelay = mean(AverageDelay)) %>%
+      ungroup() %>%
+      arrange(Month,Day)
+  })
+  
+  hourPlot <- function(df,
+                       type = NULL){
     chart <- highchart() %>%
       hc_add_series(df[df$Type==type,],
                     type = "line",
@@ -382,6 +492,7 @@ server <- function(input, output, session) {
       hc_credits(enabled = TRUE,
                  text = "Source: Brazillian National Civil Aviation Agency",
                  style = list(fontSize = "10px"))
+    
     return(chart)
   }
   
@@ -478,6 +589,103 @@ server <- function(input, output, session) {
     return(chart)
   }
   
+  heatMapWeek <- function(df){
+    chart <- hchart(df, 
+                    type = "heatmap", 
+                    hcaes(x = WeekDay, 
+                          y = factor(Hour), 
+                          value = round(AverageDelay,2))) %>%
+      hc_yAxis(title = list(text="Hour")) %>%
+      hc_xAxis(title = list(text="Week day")) %>%
+      hc_tooltip(pointFormat = "<b>Day of Week:</b> {point.WeekDay} <br>
+                                <b>Hour:</b> {point.Hour} <br>
+                                <b>Average Delay Time:</b> {point.AverageDelay} ") %>%
+      hc_colorAxis(minColor = "#4144f4",
+                   maxColor = "#f44b42") %>%
+      hc_title(text = paste("Weekday by Hour Heatmap"),
+               align = "center") %>%
+      hc_subtitle(text = "Click on the map to more information",
+                  align = "center") %>%
+      hc_credits(enabled = TRUE,
+                 text = "Source: Brazillian National Civil Aviation Agency",
+                 style = list(fontSize = "10px")) %>%
+      hc_legend(enabled = T,
+                verticalAlign = 'top',
+                layout = "vertical",
+                margin = 0,
+                symbolHeight = 220,
+                y = 100,
+                align = 'right') %>%
+      hc_add_theme(hc_theme_google())
+    
+    return(chart)
+  }
+  
+  heatMapMonth <- function(df){
+    chart <- hchart(df, 
+                    type = "heatmap",
+                    hcaes(x = factor(Day), 
+                          y = Month, 
+                          value = round(AverageDelay,2))) %>%
+      hc_yAxis(reversed = TRUE,
+               title = list(text="Month")) %>%
+      hc_xAxis(title = list(text="Day of Month")) %>%
+      hc_tooltip(pointFormat = "<b>Month:</b> {point.Month} <br>
+                                <b>Day of Month:</b> {point.Day} <br>
+                                <b>Average Delay Time:</b> {point.AverageDelay} ") %>%
+      hc_colorAxis(minColor = "#4144f4",
+                   maxColor = "#f44b42") %>%
+      hc_title(text = paste("Day by Month Heatmap"),
+               align = "center") %>%
+      hc_subtitle(text = "Click on the map to more information",
+                  align = "center") %>%
+      hc_credits(enabled = TRUE,
+                 text = "Source: Brazillian National Civil Aviation Agency",
+                 style = list(fontSize = "10px")) %>%
+      hc_legend(enabled = T,
+                verticalAlign = 'top',
+                layout = "vertical",
+                margin = 0,
+                symbolHeight = 220,
+                y = 100,
+                align = 'right') %>%
+      hc_add_theme(hc_theme_google())
+    
+    return(chart)
+  }
+  
+  treeMap <- function(df){
+    print(df)
+    chart <- hchart(head(df), 
+                    "treemap", 
+                    hcaes(x = Justification, 
+                          value = TotalFlight, 
+                          color = AverageArrivalDelay + AverageDepartureDelay)) %>%
+      hc_colorAxis(minColor = "#4144f4",
+                   maxColor = "#f44b42") %>%
+      hc_title(text = paste("Delay by Causes"),
+               align = "center") %>%
+      hc_subtitle(text = "Click on the treemap to more information",
+                  align = "center") %>%
+      hc_tooltip(pointFormat = "<b>Number of Flights:</b> {point.TotalFlight} <br>
+                                <b>Arrival Average Delay:</b> {point.AverageArrivalDelay} <br>
+                                <b>Departure Average Delay:</b> {point.AverageDepartureDelay} ") %>%
+      hc_credits(enabled = TRUE,
+                 text = "Source: Brazillian National Civil Aviation Agency",
+                 style = list(fontSize = "10px")) %>%
+      hc_legend(enabled = T,
+                verticalAlign = 'top',
+                layout = "vertical",
+                margin = 0,
+                symbolHeight = 220,
+                y = 100,
+                align = 'right') %>%
+      hc_add_theme(hc_theme_google())  
+    
+    return(chart)
+  }
+  
+
   output$hour_departure <- renderHighchart(
     hourPlot(hourFiltered(), type = "Departure")
   )
@@ -524,8 +732,21 @@ server <- function(input, output, session) {
                    type = "Arrival")
   )
   
+  observeEvent(input$treemap_size,{
+    output$treemap <- renderHighchart(
+      treeMap(head(delayByCause,input$treemap_size)))
+  })
+  
   output$datatable <- renderDataTable(
     df2()
+  )
+  
+  output$heatmap_weekday <- renderHighchart(
+    heatMapWeek(df = weekDayHeatMapFiltered())
+  )
+  
+  output$heatmap_day_of_month <- renderHighchart(
+    heatMapMonth(df = dayOfMonthHeatMapFiltered())
   )
   
   # Rendering the option to download the file

@@ -138,6 +138,21 @@ ui <- fluidPage(
                                    selected = levels(averageDelay$Flight.Type)
                 )
       ),
+      wellPanel(
+        # Listing the details
+        h5(tags$a(img(src = "https://www.ncirl.ie/Portals/0/nciLogo.png", 
+                      height = "30px"),
+                  href = "https://www.ncirl.ie"
+        ),
+        br(),
+        tags$a("Student: Douglas Zickuhr",
+               href="https://www.linkedin.com/in/douglas-zickuhr/"),
+        br(),
+        "Student Number: 17111781"),
+        tags$a(h5("Data extracted from Kaggle"),
+               href = "https://www.kaggle.com/ramirobentes/exploring-civil-aviation-in-brazil/data")
+      ),
+      
       # Well panel to cite Shiny and RStudio
       wellPanel(h5("Built with",
                    tags$a(img(src = "https://www.rstudio.com/wp-content/uploads/2014/04/shiny.png",
@@ -329,28 +344,15 @@ ui <- fluidPage(
                  wellPanel(
                    
                    # Hint about how the map works.
-                   helpText("The heatmap diagram has differente attributes and must be manually loaded."),
-                   helpText("Press the button bellow to load the chart"),
+                   helpText("The heatmap diagram has differente attributes. Change them to modify the plot."),
                    
                    # Input to set the details for the heatmap
-                   div(style="display: inline-block;vertical-align:top; width: 150px;",selectInput(inputId = "heatmap_type",
-                                                                                                   label = "Arrival/Departure",
-                                                                                                   choices = c("Arrival","Departure"),
-                                                                                                   selected = "Arrival",
-                                                                                                   multiple = F)),
-                   div(style="display: inline-block;vertical-align:top; width: 300px;",selectInput(inputId = "heatmap_flight_type",
-                                                                                                   label = "Flight Type",
-                                                                                                   choices = c("International","Domestic","Regional"),
-                                                                                                   selected = "International",
-                                                                                                   multiple = T)),
-                   br(),
-                   
-                   # Button to update the heatmap
-                   actionButton(inputId = "updateHeatMapButton",
-                                label = "Load HeatMap"),
-                   
-                   hr(),
-                   
+                   selectInput(inputId = "heatmap_type",
+                               label = "Arrival/Departure",
+                               choices = c("Arrival","Departure"),
+                               selected = "Arrival",
+                               multiple = F,
+                               width = 150),
                    # Well panel to organise the output
                    tabsetPanel(
                      tabPanel(title = "Week day by Hour",
@@ -396,20 +398,7 @@ ui <- fluidPage(
                    downloadButton("downloadData", "Download")
                  )
         )
-      ),
-      
-      # Listing the details
-      h5(tags$a(img(src = "https://www.ncirl.ie/Portals/0/nciLogo.png", 
-                    height = "30px"),
-                href = "https://www.ncirl.ie"
-      ),
-      br(),
-      tags$a("Student: Douglas Zickuhr",
-             href="https://www.linkedin.com/in/douglas-zickuhr/"),
-      br(),
-      "Student Number: 17111781"),
-      tags$a(h5("Data extracted from Kaggle"),
-             href = "https://www.kaggle.com/ramirobentes/exploring-civil-aviation-in-brazil/data")
+      )
     )
   )
 )
@@ -496,16 +485,17 @@ server <- function(input, output, session) {
   })
   
   # Take a reactive dependency on input$updateHeatMapButton
-  weekDayHeatMapFiltered <- eventReactive(input$updateHeatMapButton,{
+  weekDayHeatMapFiltered <- eventReactive(c(input$heatmap_type, 
+                                            input$type),{
     
     # Requiring input$heatmap_type and input$heatmap_flight_type
     req(input$heatmap_type)
-    req(input$heatmap_flight_type)
+    req(input$type)
     
     # Filtering the data for the heatmap
     averageDelay %>%
-      filter(Type == input$heatmap_type & 
-               Flight.Type %in% input$heatmap_flight_type) %>%
+      filter(Flight.Type %in% input$type) %>%
+      filter(Type == input$heatmap_type) %>%
       group_by(Type,WeekDay,Hour) %>%
       summarise(AverageDelay = mean(AverageDelay)) %>%
       ungroup() %>%
@@ -515,16 +505,17 @@ server <- function(input, output, session) {
   })
   
   # Take a reactive dependency on input$updateHeatMapButton
-  dayOfMonthHeatMapFiltered <- eventReactive(input$updateHeatMapButton,{
+  dayOfMonthHeatMapFiltered <- eventReactive(c(input$heatmap_type, 
+                                               input$type),{
     
     # Requiring input$heatmap_type and input$heatmap_flight_type
     req(input$heatmap_type)
-    req(input$heatmap_flight_type)
+    req(input$type)
     
     # Filtering the data for the heatmap
     averageDelay %>%
-      filter(Type == input$heatmap_type & 
-               Flight.Type %in% input$heatmap_flight_type) %>%
+      filter(Flight.Type %in% input$type) %>%
+      filter(Type == input$heatmap_type) %>%
       group_by(Type,Month,Day) %>%
       summarise(AverageDelay = mean(AverageDelay)) %>%
       ungroup() %>%
@@ -836,14 +827,18 @@ server <- function(input, output, session) {
   )
   
   # Rendering the heatmap for week day
-  output$heatmap_weekday <- renderHighchart(
-    heatMapWeek(df = weekDayHeatMapFiltered())
-  )
+  observeEvent(c(input$heatmap_type, 
+                  input$type),{
+    output$heatmap_weekday <- renderHighchart(
+      heatMapWeek(df = weekDayHeatMapFiltered()))
+  })
   
   # Rendering the heatmap for day of month
+  observeEvent(c(input$heatmap_type, 
+                 input$type),{
   output$heatmap_day_of_month <- renderHighchart(
-    heatMapMonth(df = dayOfMonthHeatMapFiltered())
-  )
+    heatMapMonth(df = dayOfMonthHeatMapFiltered()))
+  })
   
   # Rendering the option to download the file
   output$downloadData <- downloadHandler(

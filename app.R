@@ -430,15 +430,25 @@ server <- function(input, output, session) {
     return(df)
   })
   
+  
+  # Take a reactive dependency on input$type
   df2  <- eventReactive(input$type, {
+    # Requiring input$type
     req(input$type)
+    
+    # Applying the filter based on the input$type
     df <- delayByTime %>%
       filter(Flight.Type %in% input$type)
     
+    # Returning the filtered dataframe
     return(df)
   })
   
+  
+  # Take a reactive dependency on input$type
   hourFiltered <- eventReactive(input$type, {
+    
+    # Filtering the dataframe 1 (Based on the AverageDelay df)
     df1() %>%
       # Data from Hours 0,1 and 23 had to been removed due to big noisy in the source data
       mutate(AverageDelay = if_else((Flight.Type == "International" & 
@@ -452,7 +462,10 @@ server <- function(input, output, session) {
       ungroup()
   })
   
+  # Take a reactive dependency on input$type
   dayFiltered <- eventReactive(input$type, {
+    
+    # Filtering data frame 1 by Day
     df1() %>% 
       group_by(Type, Flight.Type, Day) %>%
       summarise(AverageDelay = round(mean(AverageDelay, na.rm = T),2),
@@ -460,7 +473,10 @@ server <- function(input, output, session) {
       ungroup()
   })
   
+  # Take a reactive dependency on input$type
   weekFiltered <- eventReactive(input$type, {
+    
+    # Filtering data frame 1 by WeekDay
     df1() %>%
       group_by(Type, Flight.Type, WeekDay) %>%
       summarise(AverageDelay = round(mean(AverageDelay, na.rm = T),2),
@@ -468,7 +484,10 @@ server <- function(input, output, session) {
       ungroup()
   }) 
   
+  # Take a reactive dependency on input$type
   monthFiltered <- eventReactive(input$type, {
+    
+    # Filtering data frame 1 by Month
     df1() %>%
       group_by(Type, Flight.Type, Month) %>%
       summarise(AverageDelay = round(mean(AverageDelay, na.rm = T),2),
@@ -476,9 +495,14 @@ server <- function(input, output, session) {
       ungroup()
   })
   
+  # Take a reactive dependency on input$updateHeatMapButton
   weekDayHeatMapFiltered <- eventReactive(input$updateHeatMapButton,{
+    
+    # Requiring input$heatmap_type and input$heatmap_flight_type
     req(input$heatmap_type)
     req(input$heatmap_flight_type)
+    
+    # Filtering the data for the heatmap
     averageDelay %>%
       filter(Type == input$heatmap_type & 
                Flight.Type %in% input$heatmap_flight_type) %>%
@@ -490,9 +514,14 @@ server <- function(input, output, session) {
       filter(Hour > 2)
   })
   
+  # Take a reactive dependency on input$updateHeatMapButton
   dayOfMonthHeatMapFiltered <- eventReactive(input$updateHeatMapButton,{
+    
+    # Requiring input$heatmap_type and input$heatmap_flight_type
     req(input$heatmap_type)
     req(input$heatmap_flight_type)
+    
+    # Filtering the data for the heatmap
     averageDelay %>%
       filter(Type == input$heatmap_type & 
                Flight.Type %in% input$heatmap_flight_type) %>%
@@ -502,8 +531,11 @@ server <- function(input, output, session) {
       arrange(Month,Day)
   })
   
+  # Function to generate the hourPlot
   hourPlot <- function(df,
                        type = NULL){
+    
+    # Using highchart library
     chart <- highchart() %>%
       hc_add_series(df[df$Type==type,],
                     type = "line",
@@ -512,7 +544,6 @@ server <- function(input, output, session) {
                           group=Flight.Type)) %>%
       hc_tooltip(pointFormat = "<b>Number of Flights:</b> {point.TotalFlight} <br>
                                 <b>Average Delay:</b> {point.AverageDelay}") %>%
-      
       hc_xAxis(categories = df$Hour, 
                title = list(text = "Hour of Day")) %>%
       hc_yAxis(title = list(text = "Average Delay time in minutes")) %>% 
@@ -528,7 +559,10 @@ server <- function(input, output, session) {
     return(chart)
   }
   
+  # Function to generate the dayPlot
   dayPlot <- function(df, type = NULL){
+    
+    # Using highchart library
     highchart() %>% 
       hc_add_series(df[df$Type == type,], 
                     type = 'scatter',
@@ -554,7 +588,10 @@ server <- function(input, output, session) {
     
   }
   
+  # Function to generate the weekDayPlot
   weekDayPlot <- function(df, type = NULL){
+    
+    # Using highchart library
     chart <- highchart() %>%
       hc_xAxis(categories = df$WeekDay) %>%
       hc_add_series(df[df$Type == type,],
@@ -576,7 +613,10 @@ server <- function(input, output, session) {
     return(chart)
   }
   
+  # Function to generate the monthPlot
   monthPlot <- function(df,type = NULL){
+    
+    # Highchart library
     chart <- highchart() %>%
       hc_add_series(df[df$Type==type,],
                     type = "line",
@@ -584,7 +624,6 @@ server <- function(input, output, session) {
                           y=AverageDelay,
                           group=Flight.Type)) %>%
       hc_tooltip(pointFormat = "<b>Number of Flights:</b> {point.TotalFlight}") %>%
-      
       hc_xAxis(categories = df$Month) %>%
       hc_yAxis(title = list(text = "Average Delay time in minutes")) %>% 
       hc_title(text = paste(type," Average Delay time by Month"),
@@ -598,7 +637,10 @@ server <- function(input, output, session) {
     return(chart)
   }
   
+  # Function to generate the historicalPlot
   historicalPlot <- function(df, type = NULL){
+    
+    # It is using highchart library
     chart <- highchart(type = "stock") %>%
       hc_add_series(df[df$Type == type,],
                     type = "line",
@@ -621,7 +663,10 @@ server <- function(input, output, session) {
     return(chart)
   }
   
+  # Function to generate heatMap for Week
   heatMapWeek <- function(df){
+    
+    # Highcart library
     chart <- hchart(df, 
                     type = "heatmap", 
                     hcaes(x = WeekDay, 
@@ -653,7 +698,10 @@ server <- function(input, output, session) {
     return(chart)
   }
   
+  # Function to generate the heatMap for Month
   heatMapMonth <- function(df){
+    
+    # Using highchart function
     chart <- hchart(df, 
                     type = "heatmap",
                     hcaes(x = factor(Day), 
@@ -686,8 +734,10 @@ server <- function(input, output, session) {
     return(chart)
   }
   
+  # Function to generate the treeMap
   treeMap <- function(df){
-    print(df)
+    
+    # Using highchart library
     chart <- hchart(head(df), 
                     "treemap", 
                     hcaes(x = Justification, 
@@ -718,66 +768,79 @@ server <- function(input, output, session) {
     return(chart)
   }
   
-  
+  # Rendering the Hour Departure plot
   output$hour_departure <- renderHighchart(
     hourPlot(hourFiltered(), type = "Departure")
   )
   
+  # Rendering the Hour Arrival plot
   output$hour_arrival <- renderHighchart(
     hourPlot(hourFiltered(), type = "Arrival")
   )
   
+  # Rendering the Day Departure plot
   output$day_departure <- renderHighchart(
     dayPlot(dayFiltered(), type = "Departure")
   )
   
+  # Rendering the Day Arrival plot
   output$day_arrival <- renderHighchart(
     dayPlot(dayFiltered(), type = "Arrival")
   )
   
+  # Rendering the Week Departure plot
   output$week_departure <- renderHighchart(
     weekDayPlot(weekFiltered(),
                 type = "Departure")
   )
   
+  # Rendering the Week Arrival plot
   output$week_arrival <- renderHighchart(
     weekDayPlot(weekFiltered(),
                 type = "Arrival")
   )
   
+  # Rendering the Month Departure plot
   output$month_departure <- renderHighchart(
     monthPlot(monthFiltered(),
               type = "Departure")
   )
   
+  # Rendering the Month Arrival plot
   output$month_arrival <- renderHighchart(
     monthPlot(monthFiltered(),
               type = "Arrival")
   )
   
+  # Rendering the Historical Departure plot
   output$historical_departure <- renderHighchart(
     historicalPlot(df2(),
                    type = "Departure")
   )
   
+  # Rendering the Historical Arrival plot
   output$historical_arrival <- renderHighchart(
     historicalPlot(df2(),
                    type = "Arrival")
   )
   
+  # Rendering the treeMap based on an observer event
   observeEvent(input$treemap_size,{
     output$treemap <- renderHighchart(
       treeMap(head(delayByCause,input$treemap_size)))
   })
   
+  # Rendering the datatable
   output$datatable <- renderDataTable(
     df2()
   )
   
+  # Rendering the heatmap for week day
   output$heatmap_weekday <- renderHighchart(
     heatMapWeek(df = weekDayHeatMapFiltered())
   )
   
+  # Rendering the heatmap for day of month
   output$heatmap_day_of_month <- renderHighchart(
     heatMapMonth(df = dayOfMonthHeatMapFiltered())
   )

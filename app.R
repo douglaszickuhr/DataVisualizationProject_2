@@ -118,7 +118,7 @@ ui <- fluidPage(
   # Title of panel
   titlePanel(paste("Brazilian Flights Delay Analysis"), 
              windowTitle = "Data Visualization Final Project - Dashboard 2"),
-  helpText("The raw dataset contains over 2M flight observations from 31/Dec/2014 to 31/Jul/2017 "),
+  helpText("The purpose of this Dashboard is to analyse delayed departures and arrivals from different perspetives."),
   sidebarLayout(
     
     # The panel has the select input
@@ -343,9 +343,6 @@ ui <- fluidPage(
                  # Well panel to organise the output
                  wellPanel(
                    
-                   # Hint about how the map works.
-                   helpText("The heatmap diagram has differente attributes. Change them to modify the plot."),
-                   
                    # Input to set the details for the heatmap
                    selectInput(inputId = "heatmap_type",
                                label = "Arrival/Departure",
@@ -353,6 +350,11 @@ ui <- fluidPage(
                                selected = "Arrival",
                                multiple = F,
                                width = 150),
+                   
+                   # Hint about how the map works.
+                   helpText("Change the option above to modify the plot"),
+                   
+                   
                    # Well panel to organise the output
                    tabsetPanel(
                      tabPanel(title = "Week day by Hour",
@@ -398,7 +400,8 @@ ui <- fluidPage(
                    downloadButton("downloadData", "Download")
                  )
         )
-      )
+      ),
+      helpText("The raw dataset contains over 2M flight observations from 31/Dec/2014 to 31/Jul/2017 ")
     )
   )
 )

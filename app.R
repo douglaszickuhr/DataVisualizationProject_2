@@ -1,8 +1,8 @@
 # National College of Ireland
 # Data Visualization Project
-# Interactive Visualization 2
+# Interactive Visualization - Dashboard 2
 # Title: Analysis of Flights Delay in Brazil
-# Author: Douglas Zikcuhr
+# Author: Douglas Zickuhr
 
 
 # Loading libraries
